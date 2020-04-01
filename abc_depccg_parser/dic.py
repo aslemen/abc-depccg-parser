@@ -108,6 +108,21 @@ def _gen_abc_dic(
         if re.match(r"^(ある|有る)$", e[7]) and re.match(r"動詞,自立", e[4])
     ]
 
+    # -- う（助動詞）
+    entries_u = [
+        JanomeLexEntry(*e)
+        for e in sysdic
+        if e[7] == "う" and re.match(r"助動詞", e[4])
+    ]
+
+    # -- だろ
+    # -- でしょ
+    entries_darodesho = [
+        JanomeLexEntry(*e)
+        for e in sysdic
+        if re.match(r"^(だ|です)$", e[7]) and re.match(r"未然形", e[6])
+    ] 
+
     # -- ありません
     entries_arimasen = [
         head._replace(
@@ -128,6 +143,20 @@ def _gen_abc_dic(
     # generating entries
     # ------
     res: typing.Set[JanomeLexEntry] = set()
+
+    # -- だろう・でしょう
+    res.update(
+        head._replace(
+            surface = cop.surface + head.surface,
+            left_id = cop.left_id,
+            cost = head.cost - 10000,
+            base_form = cop.base_form + head.base_form,
+            reading = cop.reading + head.reading,
+            phonetic = cop.phonetic + head.phonetic,
+        )
+        for cop in entries_darodesho
+        for head in entries_u
+    )
 
     # -- はずがない・ある・ありません
     res.update(
