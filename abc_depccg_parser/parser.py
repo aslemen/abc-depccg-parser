@@ -9,7 +9,7 @@ from . import tokenizer
 parser: "depccg.parser.JapaneseCCGParser" = None
 
 def generate_parser(
-    model_path: pathlib.Path = None
+    model_path: typing.Union[str, pathlib.Path] = None
     # pathlib.PurePosixPath("/...")
 ) -> "depccg.parser.JapaneseCCGParser" :
     from depccg.combinator import (
@@ -90,6 +90,7 @@ def generate_parser(
 
 def parse_doc(
     doc: typing.Iterable[str],
+    model_path: typing.Union[str, pathlib.Path] = None, 
     is_to_tokenize: bool = False,
     batchsize: int = 16,
 ) -> typing.Tuple["parsed_trees", typing.Iterator[typing.Iterable[typing.Any]]]:
@@ -98,7 +99,7 @@ def parse_doc(
     global parser
 
     if not parser:
-        parser = generate_parser()
+        parser = generate_parser(model_path)
     # === END IF ===
     
     doc_stripped: typing.Iterator[str] = filter(
@@ -126,7 +127,7 @@ def parse_doc(
             tokenize = is_to_tokenize
         )
     # === END IF ===
-    print(doc_tokenized)
+
     parsed_trees = parser.parse_doc(
         doc_tokenized,
         batchsize = batchsize
@@ -144,12 +145,13 @@ def dump_batch_parsed_others(
 ):
     import depccg.printer
     
-    # TODO: redirect to stream
     depccg.printer.print_(
         parsed_trees,
         tokens_of_trees,
-        output_format,
-        lang,
+        lang = lang,
+        format = output_format,
+        # semantic_templates = None,
+        file = stream,
     )
 # === END ===
 

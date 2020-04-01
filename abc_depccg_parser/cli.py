@@ -65,13 +65,14 @@ def cmd_main():
     metavar = "<output_format>"
 )
 def cmd_parse(
-    model: pathlib.Path,
+    model: str,
     batch_size: int,
     is_to_tokenize: bool,
     output_format: str
 ):
     parsed_trees, doc_tagged = parser.parse_doc(
         doc = sys.stdin, 
+        model_path = model,
         is_to_tokenize = is_to_tokenize,
         batchsize = batch_size
     )
