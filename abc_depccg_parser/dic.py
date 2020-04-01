@@ -273,10 +273,14 @@ def _gen_abc_dic(
 # === END ===
 
 def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
-    if re.match(r"仮定", nai_entry.infl_form):
-        if re.search(r"縮約", nai_entry.infl_form):
+    nai_entry_infl = nai_entry.infl_form
+
+    if re.match(r"仮定", nai_entry_infl):
+        if re.search(r"縮約", nai_entry_infl):
+            # なきゃ, なけりゃ
             yield nai_entry
         else:
+            # なけれ - ば
             yield from (
                 nai_entry._replace(
                     surface = (
@@ -298,31 +302,68 @@ def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
                 ) for ba in ("ば", "バ")
             )
         # === END IF ===
-    elif re.match(r"基本", nai_entry.infl_form):
-        if re.match(r"縮約", nai_entry.infl_form):
-            yield from (
-                nai_entry._replace(
-                    surface = (
-                        nai_entry.surface 
-                        + to
-                    ),
-                    base_form = (
-                        nai_entry.base_form 
-                        + to
-                    ), 
-                    reading = (
-                        nai_entry.reading 
-                        + "ト"
-                    ), 
-                    phonetic = (
-                        nai_entry.phonetic 
-                        + "ト"
-                    )
-                ) for to in ("と", "ト")
+    elif re.match(r"^基本", nai_entry_infl):
+        # ない, ん - と
+        yield from (
+            nai_entry._replace(
+                surface = (
+                    nai_entry.surface 
+                    + to
+                ),
+                base_form = (
+                    nai_entry.base_form 
+                    + to
+                ), 
+                reading = (
+                    nai_entry.reading 
+                    + "ト"
+                ), 
+                phonetic = (
+                    nai_entry.phonetic 
+                    + "ト"
+                )
+            ) for to in ("と", "ト")
+        )
+    if re.match(r"連用テ接続", nai_entry_infl):
+        # なく, なくっ - て. ては
+        yield from (
+            nai_entry._replace(
+                surface = (
+                    nai_entry.surface 
+                    + te + wa["sb"]
+                ),
+                base_form = (
+                    nai_entry.base_form 
+                    + te + wa["sb"]
+                ), 
+                reading = (
+                    nai_entry.reading 
+                    + "テ" + wa["r"]
+                ), 
+                phonetic = (
+                    nai_entry.phonetic 
+                    + "テ" + wa["p"]
+                )
+            ) 
+            for te in ("て", "テ")
+            for wa in (
+                {
+                    "sb": "",
+                    "r": "",
+                    "p": "",
+                },
+                {
+                    "sb": "は",
+                    "r": "ハ",
+                    "p": "ワ"
+                },
+                {
+                    "sb": "ハ",
+                    "r": "ハ",
+                    "p": "ワ"
+                },
             )
-        else:
-            return
-        # === END IF ===
+        )
     else:
         return
     # === END IF ===
