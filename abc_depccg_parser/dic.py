@@ -82,7 +82,7 @@ def _gen_abc_dic(
         for e in sysdic
         if re.match(r"^か$", e[7])
     ]
-
+    
     # -- ない（形容詞）
     entries_nai_adj = [
         JanomeLexEntry(*e) 
@@ -221,7 +221,7 @@ def _gen_abc_dic(
                 + case["surface"] 
                 + head.surface
             ),
-            left_id = ka.left_id,
+            left_id = nakere.left_id,
             # right_id = ,
             cost = head.cost - 10000,
             #pos_major = ,
@@ -268,21 +268,24 @@ def _gen_abc_dic(
         ]
         for head in entries_nai_aux
     )
+
     return res
 # === END ===
 
 def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
-    if re.match(r"仮定", nai_entry.part_of_speech):
-        if re.match(r"縮約", nai_entry.part_of_speech):
-            return (
+    if re.match(r"仮定", nai_entry.infl_form):
+        if re.search(r"縮約", nai_entry.infl_form):
+            yield nai_entry
+        else:
+            yield from (
                 nai_entry._replace(
                     surface = (
                         nai_entry.surface 
-                        + ba["surface"]
+                        + ba
                     ),
                     base_form = (
                         nai_entry.base_form 
-                        + ba["base_form"] 
+                        + ba
                     ), 
                     reading = (
                         nai_entry.reading 
@@ -294,20 +297,18 @@ def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
                     )
                 ) for ba in ("ば", "バ")
             )
-        else:
-            yield nai_entry
         # === END IF ===
-    elif re.match(r"基本", nai_entry.part_of_speech):
-        if re.match(r"縮約", nai_entry.part_of_speech):
-            return (
+    elif re.match(r"基本", nai_entry.infl_form):
+        if re.match(r"縮約", nai_entry.infl_form):
+            yield from (
                 nai_entry._replace(
                     surface = (
                         nai_entry.surface 
-                        + to["surface"]
+                        + to
                     ),
                     base_form = (
                         nai_entry.base_form 
-                        + to["base_form"] 
+                        + to
                     ), 
                     reading = (
                         nai_entry.reading 
@@ -320,9 +321,9 @@ def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
                 ) for to in ("と", "ト")
             )
         else:
-            pass
+            return
         # === END IF ===
     else:
-        pass
+        return
     # === END IF ===
 # === END ===
