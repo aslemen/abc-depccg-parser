@@ -18,11 +18,15 @@ from . import dic
 # ------
 @click.group()
 def cmd_main():
-    pass
+    """
+    A parser of modern Japanese modelled from the ABC Treebank.
+    Powered by depccg and janome.
+    """
 # === END ===
 
 @cmd_main.command(
-    name = "parse"
+    name = "parse",
+    short_help = "parse sentences",
 )
 @click.option(
     "--model", "-m",
@@ -32,7 +36,8 @@ def cmd_main():
         dir_okay = True,
     ),
     #default = "/...",
-    metavar = "<user_model>"
+    metavar = "<user_model>",
+    help = "path to a user model"
 )
 @click.option(
     "--batchsize", "-b", "batch_size",
@@ -42,7 +47,8 @@ def cmd_main():
 )
 @click.option(
     "--tokenize/--no-tokenize", "-t/-nt", "is_to_tokenize",
-    default = False
+    default = False,
+    help = "whether to tokenize sentences before parsing"
 )
 @click.option(
     "--output-format", "--format", "-f", "output_format",
@@ -62,7 +68,8 @@ def cmd_main():
         case_sensitive = False
     ),
     default = "ABCT",
-    metavar = "<output_format>"
+    metavar = "<output_format>",
+    help = "the printing format of parsed sentences"
 )
 def cmd_parse(
     model: str,
@@ -70,6 +77,9 @@ def cmd_parse(
     is_to_tokenize: bool,
     output_format: str
 ):
+    """
+    Parse sentences in STDIN each of which is separated by a newline.
+    """
     parsed_trees, doc_tagged = parser.parse_doc(
         doc = sys.stdin, 
         model_path = model,
@@ -93,8 +103,12 @@ def cmd_parse(
 # === END ===
 
 @cmd_main.command(
-    name = "dic"
+    name = "dic",
+    short_help = "list special lexical entries"
 )
 def cmd_dic():
+    """
+    List the lexical entries specially added for this parser.
+    """
     dic.dump_dic_as_csv(stream = sys.stdout)
 # === END ===
