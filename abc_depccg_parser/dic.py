@@ -108,12 +108,28 @@ def _gen_abc_dic(
         if re.match(r"^(ある|有る)$", e[7]) and re.match(r"動詞,自立", e[4])
     ]
 
+    # -- ありません
+    entries_arimasen = [
+        head._replace(
+            surface = aru.surface + masu + head.surface,
+            left_id = aru.left_id,
+            base_form = aru.base_form + masu + head.base_form,
+            reading = aru.reading + "マセ" + head.reading,
+            phonetic = aru.phonetic + "マセ" + head.phonetic,
+        )
+        for masu in ("ませ", "マセ")
+        for aru in entries_aru
+            if re.match(r"連用", aru.infl_form)
+        for head in entries_nai_aux
+            if re.match(r"^ん", head.surface)
+    ]
+
     # ------
     # generating entries
     # ------
     res: typing.Set[JanomeLexEntry] = set()
 
-    # -- はずがない・ある
+    # -- はずがない・ある・ありません
     res.update(
         head._replace(
             surface = (
@@ -160,7 +176,10 @@ def _gen_abc_dic(
                 ("の", "ノ", "ノ"), ("ノ", "ノ", "ノ"),
             )
         ]
-        for head in itertools.chain(entries_nai_adj, entries_aru)
+        for head in itertools.chain(
+            entries_nai_adj, 
+            entries_aru, entries_arimasen
+        )
     )
 
     # -- かもしれない
