@@ -92,14 +92,29 @@ def _gen_abc_dic(
 
     # -- ない（助動詞）
     # -- ん（助動詞）
+#    entries_nai_aux = [
+#        JanomeLexEntry(*e)
+#        for e in sysdic
+#        if (
+#            re.match(r"ん", e[7]) 
+#            or (re.match(r"^ない$", e[7]) and re.match(r"助動詞", e[4]))
+#        )
+#    ]
+
+    # -- ない（助動詞）
+    # -- ん（助動詞）
+    # -- ぬ（否定助動詞）
     entries_nai_aux = [
         JanomeLexEntry(*e)
         for e in sysdic
         if (
             re.match(r"ん", e[7]) 
             or (re.match(r"^ない$", e[7]) and re.match(r"助動詞", e[4]))
+            or re.match(r"^ぬ$", e[7])
+#            or (re.match(r"^ぬ$", e[7]) and re.match(r"特殊・ヌ", e[8]))
         )
     ]
+
 
     # -- ある（自立動詞）
     entries_aru = [
@@ -107,6 +122,14 @@ def _gen_abc_dic(
         for e in sysdic
         if re.match(r"^(ある|有る)$", e[7]) and re.match(r"動詞,自立", e[4])
     ]
+
+    # -- て・で（接続助詞）
+    entries_te = [
+        JanomeLexEntry(*e)
+        for e in sysdic
+        if re.match(r"^(て|で)$", e[7]) and re.match(r"助詞,接続助詞", e[4])
+    ]
+
 
     # -- う（助動詞）
     entries_u = [
@@ -316,8 +339,78 @@ def _gen_abc_dic(
         ]
         for head in entries_nai_aux
     )
+   
+    # -- てはならない
+    res.update(
+        head._replace(
+            surface = (
+                te.surface 
+                + particle["surface"] 
+                + case["surface"]
+                + head.surface
+            ),
+            left_id = te.left_id,
+            # right_id = ,
+            cost = head.cost - 10000,
+            #pos_major = ,
+            #pos_minor1 = ,
+            #pos_minor2 = ,
+            #pos_minor3 = ,
+            #infl_type = ,
+            #infl_form =, 
+            base_form = (
+                te.base_form 
+                + particle["base_form"] 
+                + case["base_form"]
+                + head.base_form
+            ), 
+            reading = (
+                te.reading 
+                + particle["reading"] 
+                + case["reading"]
+                + head.reading
+            ), 
+            phonetic = (
+                te.phonetic 
+                + particle["phonetic"] 
+                + case["phonetic"]
+                + head.phonetic
+            )
+        )
+        for te in entries_te
+        for particle in [
+            {
+                "surface": s,
+                "base_form": s,
+                "reading": r,
+                "phonetic": p
+            } for s, r, p in (
+                ("は", "ハ", "ワ"), ("ハ", "ハ", "ワ"),
+                ("も", "モ", "モ"), ("モ", "モ", "モ"),
+            )
+        ]
+        for case in [
+            {
+                "surface": u,
+                "base_form": u,
+                "reading": tp,
+                "phonetic": tp 
+            } for u, tp in (
+                ("なら", "ナラ"),
+                ("ナラ", "ナラ"),
+                ("成ら", "ナラ"),
+                ("成ラ", "ナラ"),
+                ("行ケ", "イケ"),
+                ("行け", "イケ"),
+                ("いけ", "イケ"),
+                ("イケ", "イケ"),
+            )
+        ]
+        for head in entries_nai_aux
+    )
 
     return res
+ 
 # === END ===
 
 def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
