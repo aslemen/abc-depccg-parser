@@ -110,8 +110,8 @@ def _gen_abc_dic(
         if (
             re.match(r"ん", e[7]) 
             or (re.match(r"^ない$", e[7]) and re.match(r"助動詞", e[4]))
-            or re.match(r"^ぬ$", e[7])
-#            or (re.match(r"^ぬ$", e[7]) and re.match(r"特殊・ヌ", e[8]))
+#            or re.match(r"^ぬ$", e[7])
+            or (re.match(r"^ぬ$", e[7]) and re.match(r"特殊・ヌ", e[5]))
         )
     ]
 
@@ -121,6 +121,13 @@ def _gen_abc_dic(
         JanomeLexEntry(*e)
         for e in sysdic
         if re.match(r"^(ある|有る)$", e[7]) and re.match(r"動詞,自立", e[4])
+    ]
+
+    # -- なる・いける（補助動詞）
+    entries_vb2 = [
+        JanomeLexEntry(*e)
+        for e in sysdic
+        if re.match(r"^(いける|行ける|なる|成る)$", e[7]) and re.match(r"動詞,非自立", e[4])
     ]
 
     # -- て・で（接続助詞）
@@ -161,6 +168,37 @@ def _gen_abc_dic(
         for head in entries_nai_aux
             if re.match(r"^ん", head.surface)
     ]
+
+    # -- なりません、いけません
+#    entries_vb2masen = [
+#        head._replace(
+#            surface = vb2.surface + masu + head.surface,
+#            left_id = vb2.left_id,
+#            base_form = vb2.base_form + masu + head.base_form,
+#            reading = vb2.reading + "マセ" + head.reading,
+#            phonetic = vb2.phonetic + "マセ" + head.phonetic,
+#        )
+#        for masu in ("ませ", "マセ")
+#        for vb2 in entries_vb2
+#            if re.match(r"連用", vb2.infl_form)
+#        for head in entries_nai_aux
+#            if re.match(r"^ん|ぬ", head.surface)
+#    ]
+
+    # -- ません
+    entries_masen = [
+        head._replace(
+            surface = masu + head.surface,
+            left_id = "*",
+            base_form = masu + head.base_form,
+            reading = "マセ" + head.reading,
+            phonetic = "マセ" + head.phonetic,
+        )
+        for masu in ("ませ", "マセ")
+        for head in entries_nai_aux
+            if re.match(r"^ん|ぬ", head.surface)       
+    ]
+
 
     # ------
     # generating entries
@@ -346,7 +384,6 @@ def _gen_abc_dic(
             surface = (
                 te.surface 
                 + particle["surface"] 
-                + case["surface"]
                 + head.surface
             ),
             left_id = te.left_id,
@@ -361,19 +398,16 @@ def _gen_abc_dic(
             base_form = (
                 te.base_form 
                 + particle["base_form"] 
-                + case["base_form"]
                 + head.base_form
             ), 
             reading = (
                 te.reading 
                 + particle["reading"] 
-                + case["reading"]
                 + head.reading
             ), 
             phonetic = (
                 te.phonetic 
                 + particle["phonetic"] 
-                + case["phonetic"]
                 + head.phonetic
             )
         )
@@ -389,24 +423,8 @@ def _gen_abc_dic(
                 ("も", "モ", "モ"), ("モ", "モ", "モ"),
             )
         ]
-        for case in [
-            {
-                "surface": u,
-                "base_form": u,
-                "reading": tp,
-                "phonetic": tp 
-            } for u, tp in (
-                ("なら", "ナラ"),
-                ("ナラ", "ナラ"),
-                ("成ら", "ナラ"),
-                ("成ラ", "ナラ"),
-                ("行ケ", "イケ"),
-                ("行け", "イケ"),
-                ("いけ", "イケ"),
-                ("イケ", "イケ"),
-            )
-        ]
-        for head in entries_nai_aux
+        for head in itertools.chain.from_iterable(
+            _iter_vb2(vb2) for vb2 in entries_vb2
     )
 
     return res
@@ -421,7 +439,7 @@ def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
             # なきゃ, なけりゃ
             yield nai_entry
         else:
-            # なけれ - ば
+            # なけれ|ね - ば
             yield from (
                 nai_entry._replace(
                     surface = (
@@ -509,3 +527,56 @@ def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
         return
     # === END IF ===
 # === END ===
+
+def _iter_vb2(vb2_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
+    vb2_entry_infl = vb2_entry.infl_form
+
+    if re.match(r"連用", vb2_entry_infl):
+        # なりません
+        yield from (
+            vb2_entry._replace(
+                surface = (
+                    vb2_entry.surface 
+                    + masen.surface
+                ),
+                base_form = (
+                    vb2_entry.base_form 
+                    + masen.base_form
+                ), 
+                reading = (
+                    vb2_entry.reading 
+                    + masen.reading
+                ), 
+                phonetic = (
+                    vb2_entry.phonetic 
+                    + masen.phonetic
+                )
+            ) for masen in entries_masen
+        )
+    elif re.match(r"^未然", vb2_entry_infl):
+        # ならない
+        yield from (
+            vb2_entry._replace(
+                surface = (
+                    vb2_entry.surface 
+                    + nai.surface
+                ),
+                base_form = (
+                    vb2_entry.base_form 
+                    + nai.base_form
+                ), 
+                reading = (
+                    vb2_entry.reading 
+                    + nai.reading
+                ), 
+                phonetic = (
+                    vb2_entry.phonetic 
+                    + nai.phonetic
+                )
+            ) for nai in entries_nai_aux
+        )
+    else:
+        return
+    # === END IF ===
+# === END ===
+
