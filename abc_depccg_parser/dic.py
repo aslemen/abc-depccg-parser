@@ -42,6 +42,42 @@ def convert_JanomeLexEntry_to_CSV(
 def generate_abc_dic(
     sysdic: typing.Optional[typing.Iterable[typing.Iterable[typing.Any]]] = None
 ) -> typing.Set[JanomeLexEntry]:
+    """
+    Generate custom Janome lexical entries for this parser.
+
+    Parameters
+    ----------
+    sysdic : internal list of lexical entries in janome.dic.SystemDictionary, optional
+        An iterable of internal representation of Janome lexical entries.
+        Optional.
+        If not given, this function will retrive one from Janome.
+
+        Giving a reference to the system lexical entries is recommended 
+            for performance reasons
+            whenever you have obtained a relevant instance 
+            which contains a Janome system dictionary.
+
+    Returns
+    -------
+    abc_entries : set of JanomeLexEntry
+        Our custom lexical entries.
+
+    Notes
+    -----
+    The authors choose a set, rather than a generator, for the returning result
+        since this subroutine is intended to be externally cached (not implemented yet).
+
+    Examples
+    --------
+    >>> import janome.tokenizer as jt
+    ... tokenizer = jt.Tokenizer()
+    ... abc_entries = dic.generate_abc_dic(
+    ...     sysdic = tokenizer.sys_dic.entries.values()
+    ... )
+    ... next(iter(abc_entries)).surface
+    "筈もあれ"
+    """
+
     if sysdic:
         return _gen_abc_dic(sysdic)
     else:
@@ -59,154 +95,256 @@ def generate_abc_dic(
             unknowns.DATA
         )
 
-        return _gen_abc_dic(janome_sys_dic.entries.values())
+        return set(_gen_abc_dic(janome_sys_dic.entries.values()))
     # === END IF ===
 # === END ===
 
 def _gen_abc_dic(
     sysdic: typing.Iterable[typing.Iterable[typing.Any]]
 ) -> typing.Set[JanomeLexEntry]:
-    # ------
-    # collecting heads
-    # ------
-    # -- はず（名詞，非自立）
-    entries_hazu = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if re.match(r"^(はず|ハズ|筈)$", e[7]) and re.match(r"名詞,非自立", e[4])
-    ]
+    """
+    An internal function that actually generates custom lexical entries.
 
-    # -- か（終助詞）
-    entries_ka = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if re.match(r"^か$", e[7])
-    ]
+    List of custom entries:
     
-    # -- ない（形容詞）
-    entries_nai_adj = [
-        JanomeLexEntry(*e) 
-        for e in sysdic
-        if re.match(r"^(ない|無い)$", e[7]) and re.match(r"形容詞", e[4])
-    ]
+    - {だろ, でしょ}う
+    - はず{が, も, は, の}{ない, ある, ありません}
+    - かもしれない
+    - {なければ, なきゃ, ないと, んと}{ならない, いけない}
+    - ては{ならない, いけない}
 
-    # -- ない（助動詞）
-    # -- ん（助動詞）
-#    entries_nai_aux = [
-#        JanomeLexEntry(*e)
-#        for e in sysdic
-#        if (
-#            re.match(r"ん", e[7]) 
-#            or (re.match(r"^ない$", e[7]) and re.match(r"助動詞", e[4]))
-#        )
-#    ]
+    Parameters
+    ----------
+    sysdic : internal list of lexical entries in janome.dic.SystemDictionary, optional
 
-    # -- ない（助動詞）
-    # -- ん（助動詞）
-    # -- ぬ（否定助動詞）
-    entries_nai_aux = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if (
-            re.match(r"ん", e[7]) 
-            or (re.match(r"^ない$", e[7]) and re.match(r"助動詞", e[4]))
-#            or re.match(r"^ぬ$", e[7])
-            or (re.match(r"^ぬ$", e[7]) and re.match(r"特殊・ヌ", e[5]))
+    Yields
+    -------
+    abc_entry : JanomeLexEntry
+        One of our custom lexical entries.
+    """
+
+    # ------
+    # collecting atomic morphemes
+    # ------
+
+    # Note: Lists of found morphemes should be fixed as tuples
+    #       rather than iterators so that they can be made use of
+    #       (possibly) multiple times.
+
+    morphemes: typing.Dict[str, typing.Tuple[JanomeLexEntry]] = {
+        # -- はず（名詞，非自立）
+        "hazu": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(はず|ハズ|筈)$", e[7]) and re.match(r"名詞,非自立", e[4])
+        ),
+        # -- か（終助詞）
+        "ka": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^か$", e[7])
+        ),
+        # -- ない（形容詞）
+        "nai_adj": tuple(
+            JanomeLexEntry(*e) 
+            for e in sysdic
+            if re.match(r"^(ない|無い)$", e[7]) and re.match(r"形容詞", e[4])
+        ),
+        # -- ない（助動詞）
+        # -- ん（助動詞）
+        # -- ぬ（否定助動詞）
+        "nai_aux": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if (
+                re.match(r"^ん$", e[7]) 
+                or (re.match(r"^ない$", e[7]) and re.match(r"助動詞", e[4]))
+                or (re.match(r"^ぬ$", e[7]) and re.match(r"特殊・ヌ", e[5]))
+            )
+        ),
+        # -- ます（助動詞）
+        "masu": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^ます", e[7]) and re.match(r"助動詞", e[4])
+        ),
+        # -- ある（自立動詞）
+        "aru": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(ある|有る)$", e[7]) and re.match(r"動詞,自立", e[4])
+        ),
+        # -- なる（補助動詞）
+        "naru": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(なる|成る)$", e[7]) and re.match(r"動詞,非自立", e[4])
+        ),
+        # -- いく（補助動詞）
+        "iku": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(いく|行く)$", e[7]) and re.match(r"動詞,非自立", e[4])
+        ),
+        # -- いける（補助動詞）
+        "ikeru": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(いける|行ける)$", e[7]) and re.match(r"動詞,非自立", e[4])
+        ),
+        # -- て・で（接続助詞）
+        "te": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(て|で)$", e[7]) and re.match(r"助詞,接続助詞", e[4])
+        ),
+        # -- う（助動詞）
+        "u": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^う$", e[7]) and re.match(r"助動詞", e[4])
+        ),
+        # -- だろ
+        # -- でしょ
+        "daro": tuple(
+            JanomeLexEntry(*e)
+            for e in sysdic
+            if re.match(r"^(だ|です)$", e[7]) and re.match(r"未然形", e[6])
         )
-    ]
+    }
 
-
-    # -- ある（自立動詞）
-    entries_aru = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if re.match(r"^(ある|有る)$", e[7]) and re.match(r"動詞,自立", e[4])
-    ]
-
-    # -- なる・いける（補助動詞）
-    entries_vb2 = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if re.match(r"^(いける|行ける|なる|成る)$", e[7]) and re.match(r"動詞,非自立", e[4])
-    ]
-
-    # -- て・で（接続助詞）
-    entries_te = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if re.match(r"^(て|で)$", e[7]) and re.match(r"助詞,接続助詞", e[4])
-    ]
-
-
-    # -- う（助動詞）
-    entries_u = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if e[7] == "う" and re.match(r"助動詞", e[4])
-    ]
-
-    # -- だろ
-    # -- でしょ
-    entries_darodesho = [
-        JanomeLexEntry(*e)
-        for e in sysdic
-        if re.match(r"^(だ|です)$", e[7]) and re.match(r"未然形", e[6])
-    ] 
-
-    # -- ありません
-    entries_arimasen = [
+    # ------
+    # generating intermediate morphemes
+    # ------
+    # -- ません（助動詞）
+    morphemes_masen: typing.Tuple[JanomeLexEntry] = tuple(
         head._replace(
-            surface = aru.surface + masu + head.surface,
-            left_id = aru.left_id,
-            base_form = aru.base_form + masu + head.base_form,
-            reading = aru.reading + "マセ" + head.reading,
-            phonetic = aru.phonetic + "マセ" + head.phonetic,
+            surface = masu.surface + head.surface,
+            left_id = masu.left_id,
+            base_form = masu.base_form + head.base_form,
+            reading = masu.reading + head.reading,
+            phonetic = masu.phonetic + head.phonetic,
         )
-        for masu in ("ませ", "マセ")
-        for aru in entries_aru
-            if re.match(r"連用", aru.infl_form)
-        for head in entries_nai_aux
+        for masu in morphemes["masu"]
+            if re.match(r"未然形", masu.infl_form)
+                # -- ruling out 未然ウ接続 for ましょう
+        for head in morphemes["nai_aux"]
             if re.match(r"^ん", head.surface)
-    ]
+    )
 
-    # -- なりません、いけません
-#    entries_vb2masen = [
-#        head._replace(
-#            surface = vb2.surface + masu + head.surface,
-#            left_id = vb2.left_id,
-#            base_form = vb2.base_form + masu + head.base_form,
-#            reading = vb2.reading + "マセ" + head.reading,
-#            phonetic = vb2.phonetic + "マセ" + head.phonetic,
-#        )
-#        for masu in ("ませ", "マセ")
-#        for vb2 in entries_vb2
-#            if re.match(r"連用", vb2.infl_form)
-#        for head in entries_nai_aux
-#            if re.match(r"^ん|ぬ", head.surface)
-#    ]
-
-    # -- ません
-    entries_masen = [
-        head._replace(
-            surface = masu + head.surface,
-            left_id = "*",
-            base_form = masu + head.base_form,
-            reading = "マセ" + head.reading,
-            phonetic = "マセ" + head.phonetic,
+    morphemes_intermediate: typing.Dict[
+        str, typing.Tuple[JanomeLexEntry]
+    ] = {
+        # -- ない・ありません（述語）
+        "nai/arimasen": tuple(
+            itertools.chain(
+                # -- ない
+                morphemes["nai_adj"],
+                # -- ありません
+                (
+                    head._replace(
+                        surface = aru.surface + head.surface,
+                        left_id = aru.left_id,
+                        base_form = aru.base_form + head.base_form,
+                        reading = aru.reading + head.reading,
+                        phonetic = aru.phonetic + head.phonetic,
+                    )
+                    for aru in morphemes["aru"]
+                        if re.match(r"連用形", aru.infl_form)
+                        # excluing テ形 such as in あって
+                    for head in morphemes_masen
+                )
+            )
+        ),
+        # -- ならない・ならぬ・ならん・なりません
+        "naranai/naranu/naran/narimasen": tuple(
+            itertools.chain(
+                # -- ならない・ぬ・ん
+                (
+                    head._replace(
+                        surface = vb2.surface + head.surface,
+                        left_id = vb2.left_id,
+                        base_form = vb2.base_form + head.base_form,
+                        reading = vb2.reading + head.reading,
+                        phonetic = vb2.phonetic + head.phonetic,
+                    )
+                    for vb2 in morphemes["naru"]
+                        if re.match(r"未然形", vb2.infl_form)
+                        # excluding 未然ウ接続 such as in なろう
+                    for head in morphemes["nai_aux"]
+                ),
+                # -- なりません
+                (
+                    head._replace(
+                        surface = vb2.surface + head.surface,
+                        left_id = vb2.left_id,
+                        base_form = vb2.base_form + head.base_form,
+                        reading = vb2.reading + "マセ" + head.reading,
+                        phonetic = vb2.phonetic + "マセ" + head.phonetic,
+                    )
+                    for vb2 in morphemes["naru"]
+                        if re.match(r"連用形", vb2.infl_form)
+                        # excluding テ形 such as in なって
+                    for head in morphemes_masen
+                )
+            )
+        ),
+        # -- いけない・いかぬ・いかん・いけません
+        "ikenai/ikanu/ikan/ikemasen": tuple(
+            itertools.chain(
+                # -- いけない
+                (
+                    head._replace(
+                        surface = vb2.surface + head.surface,
+                        left_id = vb2.left_id,
+                        base_form = vb2.base_form + head.base_form,
+                        reading = vb2.reading + head.reading,
+                        phonetic = vb2.phonetic + head.phonetic,
+                    )
+                    for vb2 in morphemes["ikeru"]
+                        if re.match(r"未然形", vb2.infl_form)
+                        # excluding 未然ウ接続 such as in ??行けよう
+                    for head in morphemes["nai_aux"]
+                        if re.match(r"^(ない|無い)$", head.base_form)
+                ),
+                # -- いかぬ・いかん
+                (
+                    head._replace(
+                        surface = vb2.surface + head.surface,
+                        left_id = vb2.left_id,
+                        base_form = vb2.base_form + head.base_form,
+                        reading = vb2.reading + head.reading,
+                        phonetic = vb2.phonetic + head.phonetic,
+                    )
+                    for vb2 in morphemes["iku"]
+                        if re.match(r"未然形", vb2.infl_form)
+                        # excluding 未然ウ接続 such as in 行こう
+                    for head in morphemes["nai_aux"]
+                        if re.match(r"^(ぬ|ん)$", head.base_form)
+                ),
+                # -- いけません
+                (
+                    head._replace(
+                        surface = vb2.surface + head.surface,
+                        left_id = vb2.left_id,
+                        base_form = vb2.base_form + head.base_form,
+                        reading = vb2.reading + head.reading,
+                        phonetic = vb2.phonetic + head.phonetic,
+                    )
+                    for vb2 in morphemes["ikeru"]
+                        if re.match(r"連用形", vb2.infl_form)
+                        # excluding テ形 such as in 行けて
+                    for head in morphemes_masen
+                ),
+            )
         )
-        for masu in ("ませ", "マセ")
-        for head in entries_nai_aux
-            if re.match(r"^ん|ぬ", head.surface)       
-    ]
-
+    }
 
     # ------
     # generating entries
     # ------
-    res: typing.Set[JanomeLexEntry] = set()
-
     # -- だろう・でしょう
-    res.update(
+    yield from (
         head._replace(
             surface = cop.surface + head.surface,
             left_id = cop.left_id,
@@ -215,12 +353,12 @@ def _gen_abc_dic(
             reading = cop.reading + head.reading,
             phonetic = cop.phonetic + head.phonetic,
         )
-        for cop in entries_darodesho
-        for head in entries_u
+        for cop in morphemes["daro"]
+        for head in morphemes["u"]
     )
 
     # -- はずがない・ある・ありません
-    res.update(
+    yield from (
         head._replace(
             surface = (
                 hazu.surface 
@@ -252,7 +390,7 @@ def _gen_abc_dic(
                 + head.phonetic
             )
         )
-        for hazu in entries_hazu
+        for hazu in morphemes["hazu"]
         for case in [
             {
                 "surface": s,
@@ -267,13 +405,13 @@ def _gen_abc_dic(
             )
         ]
         for head in itertools.chain(
-            entries_nai_adj, 
-            entries_aru, entries_arimasen
+            morphemes_intermediate["nai/arimasen"],
+            morphemes["aru"],
         )
     )
 
     # -- かもしれない
-    res.update(
+    yield from (
         head._replace(
             surface = (
                 ka.surface 
@@ -305,7 +443,7 @@ def _gen_abc_dic(
                 + head.phonetic
             )
         )
-        for ka in entries_ka
+        for ka in morphemes["ka"]
         for case in [
             {
                 "surface": s,
@@ -319,18 +457,17 @@ def _gen_abc_dic(
                 "モ知レ"
             )
         ]
-        for head in entries_nai_aux
+        for head in morphemes["nai_aux"]
     )
 
-    # -- なければならない
-    res.update(
+    # -- 「なければならない」系・「てはならない」系
+    yield from (
         head._replace(
             surface = (
-                nakere.surface 
-                + case["surface"] 
+                nakeretewa.surface 
                 + head.surface
             ),
-            left_id = nakere.left_id,
+            left_id = nakeretewa.left_id,
             # right_id = ,
             cost = head.cost - 10000,
             #pos_major = ,
@@ -340,98 +477,89 @@ def _gen_abc_dic(
             #infl_type = ,
             #infl_form =, 
             base_form = (
-                nakere.base_form 
-                + case["base_form"] 
+                nakeretewa.base_form 
                 + head.base_form
             ), 
             reading = (
-                nakere.reading 
-                + case["reading"] 
+                nakeretewa.reading 
                 + head.reading
             ), 
             phonetic = (
-                nakere.phonetic 
-                + case["phonetic"] 
+                nakeretewa.phonetic 
                 + head.phonetic
             )
         )
-        for nakere in itertools.chain.from_iterable(
-            _iter_nakya(nai) for nai in entries_nai_aux
-        )
-        for case in [
-            {
-                "surface": s,
-                "base_form": s,
-                "reading": rp,
-                "phonetic": rp 
-            } for s, rp in (
-                ("なら", "ナラ"),
-                ("ナラ", "ナラ"),
-                ("成ら", "ナラ"),
-                ("成ラ", "ナラ"),
-                ("行ケ", "イケ"),
-                ("行け", "イケ"),
-                ("いけ", "イケ"),
-                ("イケ", "イケ"),
-            )
-        ]
-        for head in entries_nai_aux
-    )
-   
-    # -- てはならない
-    res.update(
-        head._replace(
-            surface = (
-                te.surface 
-                + particle["surface"] 
-                + head.surface
+        for nakeretewa in itertools.chain(
+            # なければ・なきゃ
+            itertools.chain.from_iterable(
+                _iter_nai_cond(nai) for nai in morphemes["nai_aux"]
             ),
-            left_id = te.left_id,
-            # right_id = ,
-            cost = head.cost - 10000,
-            #pos_major = ,
-            #pos_minor1 = ,
-            #pos_minor2 = ,
-            #pos_minor3 = ,
-            #infl_type = ,
-            #infl_form =, 
-            base_form = (
-                te.base_form 
-                + particle["base_form"] 
-                + head.base_form
-            ), 
-            reading = (
-                te.reading 
-                + particle["reading"] 
-                + head.reading
-            ), 
-            phonetic = (
-                te.phonetic 
-                + particle["phonetic"] 
-                + head.phonetic
+            # ては
+            (
+                te._replace(
+                    surface = te.surface + particle["surface"],
+                    base_form = te.base_form + particle["base_form"],
+                    reading = te.reading + particle["reading"],
+                    phonetic = te.phonetic + particle["phonetic"],
+                )
+                for te in morphemes["te"]
+                for particle in [
+                    {
+                        "surface": s,
+                        "base_form": s,
+                        "reading": r,
+                        "phonetic": p
+                    } for s, r, p in (
+                        ("は", "ハ", "ワ"), ("ハ", "ハ", "ワ"),
+                        ("も", "モ", "モ"), ("モ", "モ", "モ"),
+                    )
+                ]
             )
         )
-        for te in entries_te
-        for particle in [
-            {
-                "surface": s,
-                "base_form": s,
-                "reading": r,
-                "phonetic": p
-            } for s, r, p in (
-                ("は", "ハ", "ワ"), ("ハ", "ハ", "ワ"),
-                ("も", "モ", "モ"), ("モ", "モ", "モ"),
-            )
-        ]
-        for head in itertools.chain.from_iterable(
-            _iter_vb2(vb2) for vb2 in entries_vb2
+        for head in itertools.chain(
+            morphemes_intermediate["naranai/naranu/naran/narimasen"],
+            morphemes_intermediate["ikenai/ikanu/ikan/ikemasen"],
+        )
     )
-
-    return res
- 
 # === END ===
 
-def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
+def _iter_nai_cond(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
+    """
+    Iterate the forms with conditional particles 
+        of a given lexical entry of negation (such as ない).
+
+    - {なきゃ, なけりゃ}
+    - {なけれ, ね}ば
+    - {ない, ん}と
+    - {なく, なくっ}{て, ては}
+
+    Parameters
+    ----------
+    nai_entry : JanomeLexEntry
+        An entry of negation markers.
+
+    Yields
+    -------
+    nai_entry_conditional : JanomeLexEntry
+        One of the conditional forms of the given entry.
+
+    Examples
+    --------
+    >>> nai = JanomeLexEntry(
+    ...     surface = "無い",
+    ...     left_id = 1133,
+    ...     right_id = 1144,
+    ...     cost = -300,
+    ...     part_of_speech = "",
+    ...     infl_type = "",
+    ...     infl_form = "基本",
+    ...     base_form = "ない",
+    ...     reading = "ナイ",
+    ...     phonetic = "ナイ"
+    ... )
+    ... next(_iter_nai_cond(nai)).surface
+    "無いと"
+    """
     nai_entry_infl = nai_entry.infl_form
 
     if re.match(r"仮定", nai_entry_infl):
@@ -527,56 +655,3 @@ def _iter_nakya(nai_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
         return
     # === END IF ===
 # === END ===
-
-def _iter_vb2(vb2_entry: JanomeLexEntry) -> typing.Iterator[JanomeLexEntry]:
-    vb2_entry_infl = vb2_entry.infl_form
-
-    if re.match(r"連用", vb2_entry_infl):
-        # なりません
-        yield from (
-            vb2_entry._replace(
-                surface = (
-                    vb2_entry.surface 
-                    + masen.surface
-                ),
-                base_form = (
-                    vb2_entry.base_form 
-                    + masen.base_form
-                ), 
-                reading = (
-                    vb2_entry.reading 
-                    + masen.reading
-                ), 
-                phonetic = (
-                    vb2_entry.phonetic 
-                    + masen.phonetic
-                )
-            ) for masen in entries_masen
-        )
-    elif re.match(r"^未然", vb2_entry_infl):
-        # ならない
-        yield from (
-            vb2_entry._replace(
-                surface = (
-                    vb2_entry.surface 
-                    + nai.surface
-                ),
-                base_form = (
-                    vb2_entry.base_form 
-                    + nai.base_form
-                ), 
-                reading = (
-                    vb2_entry.reading 
-                    + nai.reading
-                ), 
-                phonetic = (
-                    vb2_entry.phonetic 
-                    + nai.phonetic
-                )
-            ) for nai in entries_nai_aux
-        )
-    else:
-        return
-    # === END IF ===
-# === END ===
-
